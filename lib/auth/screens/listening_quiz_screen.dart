@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 class ListeningQuizScreen extends StatefulWidget {
   final String topicName;
@@ -15,11 +16,112 @@ class _ListeningQuizScreenState extends State<ListeningQuizScreen> {
   int score = 0;
   bool answered = false;
   int? selectedAnswerIndex;
+  
+  // Audio player instances
+  late AudioPlayer _audioPlayer;
+  bool _isPlaying = false;
+  bool _isLoading = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     questions = quizData[widget.topicName] ?? [];
+    _audioPlayer = AudioPlayer();
+    _setupAudioPlayer();
+    
+    // Auto-load first audio if questions exist
+    if (questions.isNotEmpty) {
+      _loadAudio();
+    }
+  }
+
+  void _setupAudioPlayer() {
+    // Listen to player state changes
+    _audioPlayer.playerStateStream.listen((playerState) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playerState.playing;
+          _isLoading = playerState.processingState == ProcessingState.loading ||
+                     playerState.processingState == ProcessingState.buffering;
+        });
+      }
+    });
+
+    // Listen to duration changes
+    _audioPlayer.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _duration = duration;
+        });
+      }
+    });
+
+    // Listen to position changes
+    _audioPlayer.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _position = position;
+        });
+      }
+    });
+  }
+
+  Future<void> _loadAudio() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      final question = questions[currentIndex];
+      await _audioPlayer.setAsset(question.audioPath);
+      
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading audio: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _playPause() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.play();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error playing audio: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopAudio() async {
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.seek(Duration.zero);
+    } catch (e) {
+      print('Error stopping audio: $e');
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$twoDigitMinutes:$twoDigitSeconds';
   }
 
   void checkAnswer(int index) {
@@ -34,12 +136,110 @@ class _ListeningQuizScreenState extends State<ListeningQuizScreen> {
     });
   }
 
-  void nextQuestion() {
+  Future<void> nextQuestion() async {
+    await _stopAudio();
+    
     setState(() {
       currentIndex++;
       answered = false;
       selectedAnswerIndex = null;
+      _position = Duration.zero;
     });
+
+    if (currentIndex < questions.length) {
+      await _loadAudio();
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Widget _buildAudioPlayer() {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: _isLoading ? null : _playPause,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          _isPlaying ? Icons.pause : Icons.play_arrow,
+                          size: 32,
+                        ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.green[100],
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: _isLoading ? null : _stopAudio,
+                  icon: const Icon(Icons.stop, size: 28),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Column(
+              children: [
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: Colors.green,
+                    inactiveTrackColor: Colors.grey[300],
+                    thumbColor: Colors.green,
+                    overlayColor: Colors.green.withOpacity(0.2),
+                    trackHeight: 4,
+                  ),
+                  child: Slider(
+                    value: _duration.inMilliseconds > 0
+                        ? _position.inMilliseconds / _duration.inMilliseconds
+                        : 0.0,
+                    onChanged: (value) async {
+                      final position = Duration(
+                        milliseconds: (value * _duration.inMilliseconds).round(),
+                      );
+                      await _audioPlayer.seek(position);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(_position),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        _formatDuration(_duration),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -152,6 +352,10 @@ class _ListeningQuizScreenState extends State<ListeningQuizScreen> {
                       color: Colors.green,
                     ),
                   ),
+                  
+                  // Audio Player Widget
+                  _buildAudioPlayer(),
+                  
                   const SizedBox(height: 20),
                   Text(
                     question.question,
@@ -219,35 +423,41 @@ class Question {
   final String question;
   final List<String> options;
   final int correctAnswerIndex;
+  final String audioPath; // New field for audio file path
 
   Question({
     required this.question,
     required this.options,
     required this.correctAnswerIndex,
+    required this.audioPath,
   });
 }
 
 final Map<String, List<Question>> quizData = {
   'Listening Practice Test 1': [
     Question(
-      question: 'What is the main topic discussed in the audio clip?',
+      question: 'What did Jack do over the weekend?',
       options: [
-        'The benefits of exercise',
-        'How to cook pasta',
-        'The history of the internet',
-        'Traveling tips for Europe'
+        'He went hiking with friends.',
+        'He stayed home and watched movies.',
+        'He visited his grandparents.',
+        'He attended a concert.'
+        
       ],
       correctAnswerIndex: 0,
+      audioPath: 'audio/ques1.mp3',
     ),
     Question(
-      question: 'What does the speaker suggest doing to stay healthy?',
+      question: 'What is the name of the song that the audio played?',
       options: [
-        'Eat more sugar',
-        'Exercise regularly',
-        'Watch more TV',
-        'Sleep less'
+        'Rolling in the Deep',
+        'Never Gonna Give You Up',
+        'Shape of You',
+        'Uptown Funk'
+        
       ],
       correctAnswerIndex: 1,
+      audioPath: 'audio/rolled.mp3',
     ),
     Question(
       question: 'What is implied about the meeting time?',
@@ -258,6 +468,7 @@ final Map<String, List<Question>> quizData = {
         'It is early in the morning'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/test1_q3.mp3',
     ),
     Question(
       question: 'What emotion does the speaker express?',
@@ -268,9 +479,10 @@ final Map<String, List<Question>> quizData = {
         'Confusion'
       ],
       correctAnswerIndex: 2,
+      audioPath: 'assets/audio/test1_q4.mp3',
     ),
     Question(
-      question: 'What should listeners do if they don’t understand a word?',
+      question: 'What should listeners do if they dont understand a word?',
       options: [
         'Ignore it',
         'Look it up later',
@@ -278,6 +490,7 @@ final Map<String, List<Question>> quizData = {
         'Guess the meaning'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/test1_q5.mp3',
     ),
   ],
   'Listening Practice Test 2': [
@@ -290,6 +503,7 @@ final Map<String, List<Question>> quizData = {
         'In a park'
       ],
       correctAnswerIndex: 2,
+      audioPath: 'assets/audio/test2_q1.mp3',
     ),
     Question(
       question: 'What is the woman planning to do next?',
@@ -300,6 +514,7 @@ final Map<String, List<Question>> quizData = {
         'Go shopping'
       ],
       correctAnswerIndex: 0,
+      audioPath: 'assets/audio/test2_q2.mp3',
     ),
     Question(
       question: 'Why is the man upset?',
@@ -310,9 +525,10 @@ final Map<String, List<Question>> quizData = {
         'He forgot his phone'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/test2_q3.mp3',
     ),
     Question(
-      question: 'What does the phrase “on the house” mean?',
+      question: 'What does the phrase "on the house" mean?',
       options: [
         'Free of charge',
         'At the top floor',
@@ -320,6 +536,7 @@ final Map<String, List<Question>> quizData = {
         'With extra service'
       ],
       correctAnswerIndex: 0,
+      audioPath: 'assets/audio/test2_q4.mp3',
     ),
     Question(
       question: 'What advice does the speaker give about studying?',
@@ -330,6 +547,7 @@ final Map<String, List<Question>> quizData = {
         'Use flashcards'
       ],
       correctAnswerIndex: 2,
+      audioPath: 'assets/audio/test2_q5.mp3',
     ),
   ],
   'Academic Listening Sample': [
@@ -342,6 +560,7 @@ final Map<String, List<Question>> quizData = {
         'To discuss a case study'
       ],
       correctAnswerIndex: 2,
+      audioPath: 'assets/audio/academic_q1.mp3',
     ),
     Question(
       question: 'What does the speaker say about the experiment?',
@@ -352,6 +571,7 @@ final Map<String, List<Question>> quizData = {
         'It was inconclusive'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/academic_q2.mp3',
     ),
     Question(
       question: 'What is the main focus of the study?',
@@ -362,21 +582,23 @@ final Map<String, List<Question>> quizData = {
         'Psychological effects'
       ],
       correctAnswerIndex: 3,
+      audioPath: 'assets/audio/academic_q3.mp3',
     ),
   ],
   'General Training Listening Sample': [
     Question(
       question: 'What is the correct response to the question: "Can you help me?"',
       options: [
-        'No, I can’t.',
+        'No, I cant.',
         'Yes, of course.',
         'Maybe later.',
-        'I don’t know.'
+        'I dont know.'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/general_q1.mp3',
     ),
     Question(
-      question: 'What is the speaker’s tone in the message?',
+      question: 'What is the speakers tone in the message?',
       options: [
         'Formal',
         'Friendly',
@@ -384,6 +606,7 @@ final Map<String, List<Question>> quizData = {
         'Confused'
       ],
       correctAnswerIndex: 1,
+      audioPath: 'assets/audio/general_q2.mp3',
     ),
     Question(
       question: 'Where is the speaker going?',
@@ -394,6 +617,7 @@ final Map<String, List<Question>> quizData = {
         'To the library'
       ],
       correctAnswerIndex: 0,
+      audioPath: 'assets/audio/general_q3.mp3',
     ),
   ],
 };

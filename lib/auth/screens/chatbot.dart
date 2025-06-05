@@ -63,7 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               Row(
                 children: [
-                  Image.asset('assets/gpt-robot.png', height: 30),
+                  Image.asset('icons/gpt-robot.png', height: 30),
                   const SizedBox(width: 10),
                   Text('Gemini Gpt', style: Theme.of(context).textTheme.titleLarge),
                 ],
@@ -160,7 +160,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         : Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: GestureDetector(
-                              child: Image.asset('assets/send.png'),
+                              child: Image.asset('icons/send.png'),
                               onTap: callGeminiModel,
                             ),
                           ),

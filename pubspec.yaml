@@ -20,8 +20,9 @@ dependencies:
   audioplayers: ^6.4.0
 
 assets:
-  - assets/
+  - assets/audio/
   -  .env
+  - assets/icons/
 
 dev_dependencies:
   flutter_test:

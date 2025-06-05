@@ -217,7 +217,7 @@ final Map<String, List<Question>> quizData = {
   'Writing Task 1: Describe a Graph': [
     Question(
       question: 'What is the best way to start a report describing a graph?',
-      correctAnswer: 'Introduce the graph and its main trends',
+      correctAnswer: 'By a Pie chart',
     ),
     Question(
       question: 'Which tense is most commonly used in describing graphs?',
