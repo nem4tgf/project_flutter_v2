@@ -1,7 +1,10 @@
+// lib/screens/auth/register_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth_button.dart';
+import '../../models/auth_models.dart'; // Import RegisterRequest
+import '../../models/user.dart'; // Import Role enum nếu bạn muốn gán Role khi đăng ký (mặc định là User)
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -23,7 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
   @override
   void initState() {
- super.initState();
+    super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
     _controller.forward();
@@ -49,18 +52,24 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final success = await authService.register(
-        _usernameController.text,
-        _emailController.text,
-        _passwordController.text,
-        _fullNameController.text,
+
+      // Tạo đối tượng RegisterRequest từ dữ liệu nhập vào
+      final registerRequest = RegisterRequest(
+        username: _usernameController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        fullName: _fullNameController.text.isNotEmpty ? _fullNameController.text : null,
+        role: Role.ROLE_USER, // Mặc định đăng ký là ROLE_USER
       );
 
-      if (success && context.mounted) {
+      await authService.register(registerRequest); // Gọi phương thức với đối tượng Request
+
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đăng ký thành công! Vui lòng đăng nhập')),
+          const SnackBar(content: Text('Đăng ký thành công! Bạn đã được đăng nhập.')),
         );
-        Navigator.pushReplacementNamed(context, '/login');
+        // Sau khi đăng ký và đăng nhập tự động, điều hướng đến màn hình chính
+        Navigator.pushReplacementNamed(context, '/home'); // Chuyển đến màn hình chính
       }
     } catch (e) {
       if (context.mounted) {
@@ -123,7 +132,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                             fillColor: Colors.grey[100],
                             contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
                           ),
-                          validator: (value) => value!.isEmpty ? 'Vui lòng nhập họ và tên' : null,
+                          // Họ và tên có thể không bắt buộc, nếu backend cho phép null
+                          // validator: (value) => value!.isEmpty ? 'Vui lòng nhập họ và tên' : null,
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -151,7 +161,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           ),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) =>
-                              value!.isEmpty || !value.contains('@') ? 'Email không hợp lệ' : null,
+                          value!.isEmpty || !value.contains('@') ? 'Email không hợp lệ' : null,
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -166,7 +176,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           ),
                           obscureText: true,
                           validator: (value) =>
-                              value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
+                          value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
                         ),
                         if (_errorMessage != null)
                           Padding(

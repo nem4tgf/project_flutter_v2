@@ -58,6 +58,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
     } catch (e) {
       if (context.mounted) {
         setState(() {
+          // Lấy thông báo lỗi trực tiếp từ Exception được ném ra bởi AuthService
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
@@ -131,7 +132,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> with SingleTi
                           ),
                           obscureText: true,
                           validator: (value) =>
-                              value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
+                          value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
                         ),
                         if (_errorMessage != null)
                           Padding(

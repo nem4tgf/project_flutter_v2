@@ -1,8 +1,10 @@
+// lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth_button.dart';
-import 'forgot_password_screen.dart'; // Đảm bảo dòng này có mặt
+import 'forgot_password_screen.dart';
+import '../../models/auth_models.dart'; // Import LoginRequest
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,22 +48,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final success = await authService.login(
-        _usernameController.text,
-        _passwordController.text,
+
+      // Tạo đối tượng LoginRequest từ dữ liệu nhập vào
+      final loginRequest = LoginRequest(
+        username: _usernameController.text,
+        password: _passwordController.text,
       );
 
-      if (success && context.mounted) {
+      await authService.login(loginRequest); // Gọi phương thức với đối tượng Request
+
+      if (mounted) {
+        // Đăng nhập thành công, Provider sẽ tự động rebuild MyApp và chuyển sang HomeScreen
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {
-      if (context.mounted) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
