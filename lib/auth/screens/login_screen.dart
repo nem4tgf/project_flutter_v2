@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth_button.dart';
-import 'forgot_password_screen.dart'; // Đảm bảo dòng này có mặt
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,17 +51,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         _passwordController.text,
       );
 
-      if (success && context.mounted) {
+      if (success && mounted) {
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {
-      if (context.mounted) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });

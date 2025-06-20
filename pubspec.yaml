@@ -18,10 +18,18 @@ dependencies:
   google_generative_ai: ^0.4.7
   just_audio: ^0.10.3
   audioplayers: ^6.4.0
+  url_launcher: ^6.3.0
+  decimal: ^2.3.3
+  app_links: ^6.4.0
+  flutter_vector_icons: ^2.0.0
+  material_design_icons_flutter: ^7.0.7296
+  collection: ^1.18.0
+  # Thêm thư viện intl nếu bạn muốn sử dụng các tính năng quốc tế hóa, bao gồm định dạng ngày tháng
+  intl: ^0.19.0 # Sử dụng phiên bản mới nhất hoặc phiên bản tương thích
 
 assets:
   - assets/audio/
-  -  .env
+  - .env
   - assets/icons/
 
 dev_dependencies:
@@ -31,5 +39,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
-  

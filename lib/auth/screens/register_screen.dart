@@ -23,7 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
 
   @override
   void initState() {
- super.initState();
+    super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
     _controller.forward();
@@ -65,6 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     } catch (e) {
       if (context.mounted) {
         setState(() {
+          // Lấy thông báo lỗi trực tiếp từ Exception được ném ra bởi AuthService
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
@@ -151,7 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           ),
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) =>
-                              value!.isEmpty || !value.contains('@') ? 'Email không hợp lệ' : null,
+                          value!.isEmpty || !value.contains('@') ? 'Email không hợp lệ' : null,
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -166,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                           ),
                           obscureText: true,
                           validator: (value) =>
-                              value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
+                          value!.isEmpty || value.length < 6 ? 'Mật khẩu phải >= 6 ký tự' : null,
                         ),
                         if (_errorMessage != null)
                           Padding(
