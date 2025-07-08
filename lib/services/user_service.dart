@@ -13,7 +13,7 @@ import '../models/auth_models.dart'; // Chứa RegisterRequest (cho adminCreateU
 import 'auth_service.dart'; // Import AuthService để lấy token và gọi updateCurrentUser
 
 class UserService extends ChangeNotifier {
-  final String _baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://192.168.1.10:8080';
+  final String _baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.24.26.179:8080';
   final AuthService _authService; // Dependency injection của AuthService
 
   UserService(this._authService); // Constructor nhận AuthService

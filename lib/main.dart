@@ -26,7 +26,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthService()),
-        Provider(create: (context) => EnrollmentService(Provider.of<AuthService>(context, listen: false))),
+        // Provider(create: (context) => EnrollmentService(Provider.of<AuthService>(context, listen: false))),
       ],
       child: const MyApp(),
     ),
@@ -111,7 +111,7 @@ class _MyAppState extends State<MyApp> {
         '/home': (context) => const HomeScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/chat': (context) => const MyHomePage(),
-        '/my-courses': (context) => const MyCoursesScreen(), // Đảm bảo MyCoursesScreen được import đúng
+        // '/my-courses': (context) => const MyCoursesScreen(), // Đảm bảo MyCoursesScreen được import đúng
         '/reset-password': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
           final email = args?['email'] ?? '';
@@ -121,8 +121,8 @@ class _MyAppState extends State<MyApp> {
       onGenerateRoute: (settings) {
         if (settings.name == '/learning') {
           // Đảm bảo Lesson được import và LearningScreen chấp nhận Lesson làm đối số
-          final lesson = settings.arguments as Lesson;
-          return MaterialPageRoute(builder: (context) => LearningScreen(lesson: lesson));
+          // final lesson = settings.arguments as Lesson;
+          // return MaterialPageRoute(builder: (context) => LearningScreen(lesson: lesson));
         }
         return null;
       },

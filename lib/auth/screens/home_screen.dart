@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> get _pages => [
     _buildLearningPage(),       // Index 0: Trang chủ/Học tập
     _buildPracticePage(),       // Index 1: Luyện tập
-    const LessonScreen(),       // Index 2: Tất cả các khóa học (bài học)
+    // const LessonScreen(),       // Index 2: Tất cả các khóa học (bài học)
     _buildVocabularyPage(),     // Index 3: Từ vựng
     _buildCommunityPage(),      // Index 4: Cộng đồng
     _buildProfilePage(),        // Index 5: Hồ sơ
