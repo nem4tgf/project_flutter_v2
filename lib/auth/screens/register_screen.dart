@@ -74,6 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     } catch (e) {
       if (context.mounted) {
         setState(() {
+          // Lấy thông báo lỗi trực tiếp từ Exception được ném ra bởi AuthService
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
