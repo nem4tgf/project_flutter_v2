@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Import các model DTO từ thư mục models
 import '../models/user.dart'; // Chứa Role enum
 import '../models/auth_models.dart'; // Chứa LoginRequest, LoginResponse, RegisterRequest, ResetPasswordRequest
-import '../models/user_response_models.dart'; // Chứa UserResponse (dùng cho _currentUser)
 
 class AuthService extends ChangeNotifier {
   // *******************************************************************

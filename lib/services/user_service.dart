@@ -1,38 +1,49 @@
-// lib/services/user_service.dart
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // Để dùng kIsWeb
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-// Không cần Provider.of ở đây, vì nó được inject qua constructor
-// import 'package:provider/provider.dart';
-
-// Import các model DTO
-import '../models/user.dart'; // Chứa Role enum
-import '../models/user_response_models.dart'; // Chứa UserResponse, UserPageResponse, UserSearchRequest, UserUpdateRequest
-import '../models/auth_models.dart'; // Chứa RegisterRequest (cho adminCreateUser)
-
-import 'auth_service.dart'; // Import AuthService để lấy token và gọi updateCurrentUser
+import '../models/user.dart'; // Thêm UserUpdateRequest vào hide
+import '../models/auth_models.dart';
+import './auth_service.dart';
 
 class UserService extends ChangeNotifier {
   final String _baseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.24.26.179:8080';
-  final AuthService _authService; // Dependency injection của AuthService
+  final AuthService _authService;
 
-  UserService(this._authService); // Constructor nhận AuthService
+  UserService(this._authService);
 
-  // Phương thức lấy headers với token từ AuthService
-  Map<String, String> _getAuthHeaders() {
-    if (!_authService.isAuthenticated) {
-      // Nếu không được xác thực, có thể đăng xuất hoặc ném lỗi để xử lý ở UI
-      // Đây là một ví dụ, bạn có thể chọn cách xử lý phù hợp nhất
+  Map<String, String> _getAuthHeaders({bool requireAuth = true}) {
+    if (requireAuth && !_authService.isAuthenticated) {
       throw Exception('Người dùng chưa được xác thực. Vui lòng đăng nhập lại.');
     }
-    return {
+    final headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${_authService.token}',
     };
+    if (_authService.token != null && requireAuth) {
+      headers['Authorization'] = 'Bearer ${_authService.token}';
+    }
+    return headers;
   }
 
-  // Endpoint: GET /api/users
-  // Chỉ ADMIN mới có quyền truy cập.
+  void _handleErrorResponse(http.Response response, String defaultMessage) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      _authService.logout();
+      throw Exception('Phiên đăng nhập đã hết hạn hoặc không có quyền truy cập. Vui lòng đăng nhập lại.');
+    } else if (response.statusCode >= 400 && response.statusCode < 500) {
+      try {
+        final errorBody = json.decode(response.body);
+        String errorMessage = errorBody['message'] ?? defaultMessage;
+        throw Exception(errorMessage);
+      } catch (e) {
+        // Backend trả về null body cho 400/404
+        throw Exception('$defaultMessage. Mã trạng thái: ${response.statusCode}');
+      }
+    } else {
+      throw Exception('$defaultMessage. Mã trạng thái: ${response.statusCode}');
+    }
+  }
+
+  /// Endpoint: GET /api/users
+  /// Chỉ ADMIN
   Future<List<UserResponse>> getAllUsers() async {
     final response = await http.get(
       Uri.parse('$_baseUrl/api/users'),
@@ -40,20 +51,16 @@ class UserService extends ChangeNotifier {
     );
 
     if (response.statusCode == 200) {
-      List<dynamic> body = json.decode(response.body);
-      return body.map((dynamic item) => UserResponse.fromJson(item)).toList();
-    } else if (response.statusCode == 401) {
-      _authService.logout(); // Token hết hạn, tự động đăng xuất
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền truy cập chức năng này.');
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList.map((e) => UserResponse.fromJson(e)).toList();
     } else {
-      throw Exception('Không thể tải danh sách người dùng: ${response.statusCode}');
+      _handleErrorResponse(response, 'Không thể tải danh sách người dùng.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 
-  // Endpoint: GET /api/users/{userId}
-  // Cả USER và ADMIN đều có quyền. USER chỉ được xem thông tin của chính mình.
+  /// Endpoint: GET /api/users/{userId}
+  /// USER và ADMIN (USER chỉ xem được thông tin của chính mình)
   Future<UserResponse> getUserById(int userId) async {
     final response = await http.get(
       Uri.parse('$_baseUrl/api/users/$userId'),
@@ -62,72 +69,91 @@ class UserService extends ChangeNotifier {
 
     if (response.statusCode == 200) {
       return UserResponse.fromJson(json.decode(response.body));
-    } else if (response.statusCode == 401) {
-      _authService.logout();
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền xem thông tin người dùng này.');
-    } else if (response.statusCode == 404) {
-      throw Exception('Không tìm thấy người dùng với ID: $userId');
     } else {
-      throw Exception('Không thể tải thông tin người dùng: ${response.statusCode}');
+      _handleErrorResponse(response, 'Không thể tải thông tin người dùng với ID: $userId.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 
-  // Endpoint: PUT /api/users/{userId}
-  // Cả USER và ADMIN đều có quyền. USER chỉ có thể cập nhật thông tin của chính mình.
+  /// Endpoint: GET /api/users/current
+  /// Yêu cầu xác thực
+  Future<UserResponse> getCurrentUser() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/users/current'),
+      headers: _getAuthHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final user = UserResponse.fromJson(json.decode(response.body));
+      await _authService.updateCurrentUser(user); // Cập nhật currentUser trong AuthService
+      return user;
+    } else {
+      _handleErrorResponse(response, 'Không thể tải thông tin người dùng hiện tại.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
+    }
+  }
+
+  /// Endpoint: PUT /api/users/{userId}
+  /// USER và ADMIN (USER chỉ cập nhật được thông tin của chính mình)
   Future<UserResponse> updateUser(int userId, UserUpdateRequest request) async {
     final response = await http.put(
       Uri.parse('$_baseUrl/api/users/$userId'),
       headers: _getAuthHeaders(),
-      body: json.encode(request.toJson()), // toJson() sẽ loại bỏ các trường null
+      body: json.encode(request.toJson()),
     );
 
     if (response.statusCode == 200) {
       final updatedUser = UserResponse.fromJson(json.decode(response.body));
-      // Nếu người dùng hiện tại tự cập nhật, cập nhật lại currentUser trong AuthService
       if (_authService.currentUser?.userId == updatedUser.userId) {
-        await _authService.updateCurrentUser(updatedUser); // <-- Gọi phương thức công khai trong AuthService
+        await _authService.updateCurrentUser(updatedUser);
       }
       return updatedUser;
-    } else if (response.statusCode == 401) {
-      _authService.logout();
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền cập nhật người dùng này.');
-    } else if (response.statusCode == 400) {
-      final error = json.decode(response.body);
-      throw Exception(error['message'] ?? 'Cập nhật người dùng thất bại. Vui lòng kiểm tra lại thông tin.');
     } else {
-      throw Exception('Cập nhật người dùng thất bại: ${response.statusCode}');
+      _handleErrorResponse(response, 'Cập nhật người dùng thất bại.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 
-  // Endpoint: DELETE /api/users/{userId}
-  // Chỉ ADMIN mới có quyền.
+  /// Endpoint: DELETE /api/users/{userId}
+  /// Chỉ ADMIN
   Future<void> deleteUser(int userId) async {
     final response = await http.delete(
       Uri.parse('$_baseUrl/api/users/$userId'),
       headers: _getAuthHeaders(),
     );
 
-    if (response.statusCode == 204) { // HttpStatus.NO_CONTENT
-      // Thành công
-    } else if (response.statusCode == 401) {
-      _authService.logout();
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền xóa người dùng này.');
-    } else if (response.statusCode == 404) {
-      throw Exception('Không tìm thấy người dùng với ID: $userId');
+    if (response.statusCode == 204) {
+      notifyListeners();
+      return;
     } else {
-      throw Exception('Xóa người dùng thất bại: ${response.statusCode}');
+      _handleErrorResponse(response, 'Xóa người dùng thất bại.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 
-  // Endpoint: POST /api/users/search
-  // Chỉ ADMIN mới có quyền.
-  Future<UserPageResponse> searchUsers(UserSearchRequest request) async {
+  /// Endpoint: POST /api/users/search
+  /// Chỉ ADMIN
+  Future<UserPageResponse> searchUsers({
+    String? username,
+    String? email,
+    String? fullName,
+    Role? role,
+    int page = 0,
+    int size = 10,
+    String sortBy = 'userId',
+    String sortDir = 'ASC',
+  }) async {
+    final request = UserSearchRequest(
+      username: username,
+      email: email,
+      fullName: fullName,
+      role: role,
+      page: page,
+      size: size,
+      sortBy: sortBy,
+      sortDir: sortDir,
+    );
+
     final response = await http.post(
       Uri.parse('$_baseUrl/api/users/search'),
       headers: _getAuthHeaders(),
@@ -136,21 +162,14 @@ class UserService extends ChangeNotifier {
 
     if (response.statusCode == 200) {
       return UserPageResponse.fromJson(json.decode(response.body));
-    } else if (response.statusCode == 401) {
-      _authService.logout();
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền tìm kiếm người dùng.');
-    } else if (response.statusCode == 400) {
-      final error = json.decode(response.body);
-      throw Exception(error['message'] ?? 'Tìm kiếm người dùng thất bại.');
     } else {
-      throw Exception('Tìm kiếm người dùng thất bại: ${response.statusCode}');
+      _handleErrorResponse(response, 'Tìm kiếm người dùng thất bại.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 
-  // Endpoint: POST /api/users/admin-create
-  // Chỉ ADMIN mới có quyền.
+  /// Endpoint: POST /api/users/admin-create
+  /// Chỉ ADMIN
   Future<UserResponse> adminCreateUser(RegisterRequest request) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/api/users/admin-create'),
@@ -158,18 +177,11 @@ class UserService extends ChangeNotifier {
       body: json.encode(request.toJson()),
     );
 
-    if (response.statusCode == 201) { // HttpStatus.CREATED
+    if (response.statusCode == 201) {
       return UserResponse.fromJson(json.decode(response.body));
-    } else if (response.statusCode == 401) {
-      _authService.logout();
-      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-    } else if (response.statusCode == 403) {
-      throw Exception('Bạn không có quyền tạo người dùng mới.');
-    } else if (response.statusCode == 400) {
-      final error = json.decode(response.body);
-      throw Exception(error['message'] ?? 'Tạo người dùng thất bại. Vui lòng kiểm tra lại thông tin.');
     } else {
-      throw Exception('Tạo người dùng thất bại: ${response.statusCode}');
+      _handleErrorResponse(response, 'Tạo người dùng thất bại.');
+      return Future.error(Exception('Unknown error after _handleErrorResponse'));
     }
   }
 }
